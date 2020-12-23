@@ -30,6 +30,7 @@
   },
   "description": "My webpack project",
   "dependencies": {
-    "commander": "^6.2.1"
+    "commander": "^6.2.1",
+    "rxjs": "^6.6.3"
   }
 }
