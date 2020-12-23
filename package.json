@@ -31,6 +31,7 @@
   "description": "My webpack project",
   "dependencies": {
     "commander": "^6.2.1",
+    "m3u8-parser": "^4.5.0",
     "rxjs": "^6.6.3"
   }
 }

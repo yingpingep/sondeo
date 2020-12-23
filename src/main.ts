@@ -1,22 +1,21 @@
-import commander from "commander";
-import { Observable } from "rxjs";
+import commander from 'commander';
+import { Wrapper } from './wrapper';
+import fs from 'fs';
+import { Parser } from 'm3u8-parser';
 
 const program = commander.program;
 program
-  .option("-d, --debug", "output extra debugging")
-  .option("-s, --small", "small pizza size")
-  .option("-p, --pizza-type <type>", "flavour of pizza")
-  .option("-r, --rx, rx");
+  .requiredOption('-t, --target <string>', 'm3u8 target url')
+  .requiredOption('-o, --out-path <string>', 'output path');
 
 program.parse(process.argv);
 
-if (program.debug) console.log(program.opts());
-console.log("pizza details:");
-if (program.small) console.log("- small pizza size");
-if (program.pizzaType) console.log(`- ${program.pizzaType}`);
-if (program.rx) {
-  new Observable((sub) => {
-    sub.next(1);
-    sub.next(2);
-  }).subscribe(console.log);
-}
+console.log(`⚡ => ${program.target}`);
+console.log(`⚡ => ${program.outPath}`);
+// const wrapper = new Wrapper(program.target, program.outPath);
+fs.readFile('./test/master.m3u8', (err, data) => {
+  const parser = new Parser();
+  parser.push(data.toString());
+  parser.end();
+  parser.manifest.playlists.forEach((v) => console.log(v));
+});
