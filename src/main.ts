@@ -2,27 +2,8 @@ import commander from 'commander';
 import { Wrapper } from './wrapper';
 import fs from 'fs';
 import { Parser } from 'm3u8-parser';
-import {
-  catchError,
-  concatAll,
-  concatMap,
-  exhaustMap,
-  observeOn,
-  switchMap,
-  take,
-  tap,
-} from 'rxjs/operators';
-import {
-  concat,
-  merge,
-  Observable,
-  of,
-  queueScheduler,
-  scheduled,
-  Subject,
-  Subscriber,
-  throwError,
-} from 'rxjs';
+import { catchError, concatMap, switchMap } from 'rxjs/operators';
+import { of, Subject, throwError } from 'rxjs';
 
 const program = commander.program;
 program
