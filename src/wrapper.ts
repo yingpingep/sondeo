@@ -1,14 +1,60 @@
 import { Observable, Subject } from 'rxjs';
-import http, { ClientRequest, IncomingMessage } from 'http';
+import http, { Agent } from 'http';
 import fs from 'fs';
+import { RequestOptions } from 'https';
+import { Parser } from 'm3u8-parser';
+import { map } from 'rxjs/operators';
 
 export class Wrapper {
   private url: URL;
+  private initiateFile: string;
   private outPath: string;
+  private agent: Agent;
   constructor(target: string, outPath: string) {
     this.url = new URL(target);
+    this.initiateFile = this.url.pathname.split('/').slice(-1)[0];
     this.outPath = outPath;
+    this.agent = new Agent({ keepAlive: true });
+  }
+  getIndex(): Observable<string> {
+    return this.get(this.initiateFile).pipe(
+      map((filename) => {
+        const parser = new Parser();
+        parser.push(fs.readFileSync(filename).toString());
+        parser.end();
+        return parser.manifest.playlists[0].uri;
+      })
+    );
+  }
+  get(path: string, fileName?: string): Observable<string> {
+    const notify = new Subject<string>();
+    const originalPathList = this.url.pathname.split('/').slice(0, -1);
+    originalPathList.push(path);
 
-    console.log(this.url, this.outPath);
+    const outputFileName = `${this.outPath}/${fileName || path}`;
+
+    const option: RequestOptions = {
+      host: this.url.host,
+      path: originalPathList.join('/') + this.url.search,
+      agent: this.agent,
+    };
+
+    const req = http.get(option);
+    req.on('response', (res) => {
+      const data: Buffer[] = [];
+      res.on('data', (chunk: Buffer) => {
+        data.push(chunk);
+      });
+
+      res.on('end', () => {
+        fs.writeFileSync(outputFileName, Buffer.concat(data));
+        notify.next(outputFileName);
+        notify.complete();
+      });
+    });
+    req.on('error', (err) => notify.error(err));
+    req.end();
+
+    return notify;
   }
 }
