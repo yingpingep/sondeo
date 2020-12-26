@@ -5,6 +5,10 @@ import { RequestOptions } from 'https';
 import { Parser } from 'm3u8-parser';
 import { map } from 'rxjs/operators';
 
+export interface IndexResult {
+  isLocalFile: boolean;
+  location: string;
+}
 export class Wrapper {
   private url: URL;
   private initiateFile: string;
@@ -16,13 +20,18 @@ export class Wrapper {
     this.outPath = outPath;
     this.agent = new Agent({ keepAlive: true });
   }
-  getIndex(): Observable<string> {
+  getIndex(): Observable<IndexResult> {
     return this.get(this.initiateFile).pipe(
       map((filename) => {
         const parser = new Parser();
         parser.push(fs.readFileSync(filename).toString());
         parser.end();
-        return parser.manifest.playlists[0].uri;
+
+        const hasPlaylists = !!parser.manifest.playlists;
+        return {
+          isLocalFile: !hasPlaylists,
+          location: hasPlaylists ? parser.manifest.playlists[0].uri : filename,
+        } as IndexResult;
       })
     );
   }
