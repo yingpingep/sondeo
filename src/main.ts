@@ -16,17 +16,20 @@ const obj = new Subject<string>();
 const wrapper = new Wrapper(program.target, program.outPath);
 obj
   .pipe(concatMap((name) => wrapper.get(name)))
-  .subscribe((v) => console.log('⚡', v));
+  .subscribe((filename) => console.log('⚡', filename, 'done'));
 
 wrapper
   .getIndex()
   .pipe(
-    switchMap((index) => {
-      const c = index.match(/(.*\.m3u8)(\?.*)/);
-      if (c) {
-        return wrapper.get(index, c[1]);
+    switchMap((result) => {
+      console.log(result);
+      const outputFilename = result.location.match(/(.*\.m3u8)(\?{0,1}.*)/);
+      if (!outputFilename) {
+        return throwError('index is not found');
       }
-      return throwError('index is not found');
+      return result.isLocalFile
+        ? of(result.location)
+        : wrapper.get(result.location, outputFilename[1]);
     }),
     catchError((e) => {
       console.log(`⚡⚡ => ${e}`);
@@ -45,9 +48,9 @@ wrapper
     parser.end();
 
     parser.manifest.segments.forEach((segment) => {
-      let x = segment.uri.match(/(.*\.ts)(\?.*)/);
-      if (x) {
-        obj.next(x[1]);
+      let nextFileName = segment.uri.match(/(.*\.ts)(\?{0,1}.*)/);
+      if (nextFileName) {
+        obj.next(nextFileName[1]);
       }
     });
   });
