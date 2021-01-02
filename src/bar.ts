@@ -23,9 +23,7 @@ export class Bar {
 
   write(value: number): void {
     const cp = this.getCurrentPercent(value);
-    if (cp !== 0 && cp % 4 === 0) {
-      this.dx += 1;
-    }
+    this.dx = Math.floor(cp / 4);
 
     this.stdout.cursorTo(0);
     const str = `[${'#'.repeat(this.dx)}${'.'.repeat(
