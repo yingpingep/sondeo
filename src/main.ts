@@ -1,9 +1,10 @@
 import commander from 'commander';
 import { Wrapper } from './wrapper';
+import { Bar } from './bar';
 import fs from 'fs';
 import { Parser } from 'm3u8-parser';
 import { catchError, concatMap, switchMap } from 'rxjs/operators';
-import { of, Subject, throwError } from 'rxjs';
+import { of, Subject, throwError, zip } from 'rxjs';
 
 const program = commander.program;
 program
@@ -12,11 +13,21 @@ program
 
 program.parse(process.argv);
 
-const obj = new Subject<string>();
+const pathExists = fs.existsSync(program.outPath);
+
+if (!pathExists) {
+  fs.mkdir(program.outPath, () => {
+    console.log(program.outPath, 'created');
+  });
+}
+
+const obj = new Subject<[number, string]>();
 const wrapper = new Wrapper(program.target, program.outPath);
-obj
-  .pipe(concatMap((name) => wrapper.get(name)))
-  .subscribe((filename) => console.log('⚡', filename, 'done'));
+const bar = new Bar();
+
+obj.pipe(concatMap((v) => zip(of(v[0]), wrapper.get(v[1])))).subscribe((x) => {
+  bar.write(x[0]);
+});
 
 wrapper
   .getIndex()
@@ -51,13 +62,14 @@ wrapper
     }
 
     if (parser.manifest.segments[0].key) {
-      obj.next(parser.manifest.segments[0].key.uri);
+      obj.next([0, parser.manifest.segments[0].key.uri]);
     }
 
-    parser.manifest.segments.forEach((segment) => {
+    bar.setMaxValue(parser.manifest.segments.length);
+    parser.manifest.segments.forEach((segment, index) => {
       let nextFileName = segment.uri.match(/(.*\.ts)(\??.*)/);
       if (nextFileName) {
-        obj.next(nextFileName[1]);
+        obj.next([index, nextFileName[1]]);
       }
     });
   });
