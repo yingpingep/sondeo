@@ -1,5 +1,5 @@
 import { Observable, Subject } from 'rxjs';
-import http, { Agent } from 'http';
+import https, { Agent } from 'https';
 import fs from 'fs';
 import { RequestOptions } from 'https';
 import { Parser } from 'm3u8-parser';
@@ -12,8 +12,8 @@ export interface IndexResult {
 export class Wrapper {
   private url: URL;
   private initiateFile: string;
-  private outPath: string;
-  private agent: Agent;
+  private readonly outPath: string;
+  private readonly agent: Agent;
   constructor(target: string, outPath: string) {
     this.url = new URL(target);
     this.initiateFile = this.url.pathname.split('/').slice(-1)[0];
@@ -48,7 +48,7 @@ export class Wrapper {
       agent: this.agent,
     };
 
-    const req = http.get(option);
+    const req = https.get(option);
     req.on('response', (res) => {
       const data: Buffer[] = [];
       res.on('data', (chunk: Buffer) => {

@@ -22,8 +22,7 @@ wrapper
   .getIndex()
   .pipe(
     switchMap((result) => {
-      console.log(result);
-      const outputFilename = result.location.match(/(.*\.m3u8)(\?{0,1}.*)/);
+      const outputFilename = result.location.match(/(.*\.m3u8)(\??.*)/);
       if (!outputFilename) {
         return throwError('index is not found');
       }
@@ -48,7 +47,7 @@ wrapper
     parser.end();
 
     parser.manifest.segments.forEach((segment) => {
-      let nextFileName = segment.uri.match(/(.*\.ts)(\?{0,1}.*)/);
+      let nextFileName = segment.uri.match(/(.*\.ts)(\??.*)/);
       if (nextFileName) {
         obj.next(nextFileName[1]);
       }

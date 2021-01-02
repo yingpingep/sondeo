@@ -4,3 +4,5 @@ test
 yarn-error.log
 package-lock.json
 yarn.lock
+temp
+.idea

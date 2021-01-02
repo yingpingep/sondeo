@@ -15,6 +15,7 @@ declare module 'm3u8-parser' {
     duration: number;
     uri: string;
     timeline: number;
+    key: Key;
   }
 
   export interface MediaGroups {
@@ -43,5 +44,10 @@ declare module 'm3u8-parser' {
   export interface Resolution {
     width: number;
     height: number;
+  }
+  export interface Key {
+    method: string;
+    uri: string;
+    iv: number[];
   }
 }
