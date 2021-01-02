@@ -46,6 +46,14 @@ wrapper
     parser.push(content.toString());
     parser.end();
 
+    if (!parser.manifest || !parser.manifest.segments) {
+      return;
+    }
+
+    if (parser.manifest.segments[0].key) {
+      obj.next(parser.manifest.segments[0].key.uri);
+    }
+
     parser.manifest.segments.forEach((segment) => {
       let nextFileName = segment.uri.match(/(.*\.ts)(\??.*)/);
       if (nextFileName) {
