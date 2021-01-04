@@ -26,7 +26,7 @@ const wrapper = new Wrapper(program.target, program.outPath);
 const bar = new Bar();
 
 obj.pipe(concatMap((v) => zip(of(v[0]), wrapper.get(v[1])))).subscribe((x) => {
-  bar.write(x[0]);
+  bar.write(x[0] + 1);
 });
 
 wrapper
