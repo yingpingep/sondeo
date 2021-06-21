@@ -2,9 +2,13 @@ import commander from 'commander';
 import { Wrapper } from './wrapper';
 import { Bar } from './bar';
 import fs from 'fs';
-import { Parser } from 'm3u8-parser';
 import { catchError, concatMap, switchMap } from 'rxjs/operators';
 import { of, Subject, throwError, zip } from 'rxjs';
+import { Downloader, Parser } from './interfaces/interfaces';
+import { InjectorImpl } from './injectorImpl';
+import { ParserImpl } from './parserImpl';
+import { DownloaderImpl } from './downloaderImpl';
+import { WriterImpl } from './writerImpl';
 
 const program = commander.program;
 program
@@ -22,7 +26,12 @@ if (!pathExists) {
 }
 
 const obj = new Subject<[number, string]>();
-const wrapper = new Wrapper(program.target, program.outPath);
+const injector = new InjectorImpl();
+const writer = new WriterImpl();
+injector.set('Parser', new ParserImpl());
+injector.set('Downloader', new DownloaderImpl(writer));
+
+const wrapper = new Wrapper(program.target, program.outPath, injector);
 const bar = new Bar();
 
 obj.pipe(concatMap((v) => zip(of(v[0]), wrapper.get(v[1])))).subscribe((x) => {
@@ -53,20 +62,19 @@ wrapper
 
     const content = fs.readFileSync(file);
 
-    const parser = new Parser();
-    parser.push(content.toString());
-    parser.end();
+    const parser = injector.get<Parser>('Parser');
+    const manifest = parser.parse(content);
 
-    if (!parser.manifest || !parser.manifest.segments) {
+    if (!manifest || !manifest.segments) {
       return;
     }
 
-    if (parser.manifest.segments[0].key) {
-      obj.next([0, parser.manifest.segments[0].key.uri]);
+    if (manifest.segments[0].key) {
+      obj.next([0, manifest.segments[0].key.uri]);
     }
 
-    bar.setMaxValue(parser.manifest.segments.length);
-    parser.manifest.segments.forEach((segment, index) => {
+    bar.setMaxValue(manifest.segments.length);
+    manifest.segments.forEach((segment, index) => {
       let nextFileName = segment.uri.match(/(.*\.ts)(\??.*)/);
       if (nextFileName) {
         obj.next([index, nextFileName[1]]);

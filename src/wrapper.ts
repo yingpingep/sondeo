@@ -2,8 +2,8 @@ import { Observable, Subject } from 'rxjs';
 import https, { Agent } from 'https';
 import fs from 'fs';
 import { RequestOptions } from 'https';
-import { Parser } from 'm3u8-parser';
 import { map } from 'rxjs/operators';
+import { Data, Downloader, Injector, Parser } from './interfaces/interfaces';
 
 export interface IndexResult {
   isLocalFile: boolean;
@@ -14,27 +14,43 @@ export class Wrapper {
   private initiateFile: string;
   private readonly outPath: string;
   private readonly agent: Agent;
-  constructor(target: string, outPath: string) {
+  private data: Data;
+  private parser: Parser;
+  private downloader: Downloader;
+
+  constructor(
+    target: string,
+    outPath: string,
+    injector: Injector,
+    name = 'default'
+  ) {
     this.url = new URL(target);
     this.initiateFile = this.url.pathname.split('/').slice(-1)[0];
     this.outPath = outPath;
     this.agent = new Agent({ keepAlive: true });
+
+    this.data = new Data(name);
+    this.parser = injector.get('Parser');
+    this.downloader = injector.get('Downloader');
   }
+
   getIndex(): Observable<IndexResult> {
     return this.get(this.initiateFile).pipe(
       map((filename) => {
-        const parser = new Parser();
-        parser.push(fs.readFileSync(filename).toString());
-        parser.end();
+        const manifest = this.parser.parse(fs.readFileSync(filename));
 
-        const hasPlaylists = !!parser.manifest.playlists;
+        const hasPlaylists = manifest.playlists;
+        this.data.index = hasPlaylists ? manifest.playlists[0].uri : filename;
+        this.data.parts = manifest.segments.map((s) => s.uri);
+
         return {
           isLocalFile: !hasPlaylists,
-          location: hasPlaylists ? parser.manifest.playlists[0].uri : filename,
+          location: hasPlaylists ? manifest.playlists[0].uri : filename,
         } as IndexResult;
       })
     );
   }
+
   get(path: string, fileName?: string): Observable<string> {
     const notify = new Subject<string>();
     const originalPathList = this.url.pathname.split('/').slice(0, -1);

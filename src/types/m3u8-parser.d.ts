@@ -45,6 +45,7 @@ declare module 'm3u8-parser' {
     width: number;
     height: number;
   }
+
   export interface Key {
     method: string;
     uri: string;
