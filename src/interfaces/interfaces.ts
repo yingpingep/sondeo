@@ -2,16 +2,28 @@ import { MediaGroups, Playlist, Segment } from 'm3u8-parser';
 import { Observable } from 'rxjs';
 
 export class Data {
-  index: string | undefined;
-  parts: string[] | undefined;
+  parts: Map<string, boolean>;
 
-  constructor(public name: string) {}
+  constructor() {
+    this.parts = new Map<string, boolean>();
+  }
+}
+
+export interface Status {
+  downloaded: number;
+  total: number;
+}
+
+export interface Result {
+  name: string;
+  data: DataView;
 }
 
 export interface Encoder {}
 
 export interface Downloader {
-  download(data: Data, path: string): Observable<string>;
+  url: URL | undefined;
+  download(target: string): Observable<Result>;
 }
 
 export interface Parser {

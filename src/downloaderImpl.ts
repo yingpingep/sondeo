@@ -1,31 +1,14 @@
-import { Data, Downloader, Writer } from './interfaces/interfaces';
+import { Downloader, Result } from './interfaces/interfaces';
 import https, { Agent, RequestOptions } from 'https';
-import { concat, Observable, Subject } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
+import { take } from 'rxjs/operators';
 
 export class DownloaderImpl implements Downloader {
   url: URL | undefined;
   private agent = new Agent({ keepAlive: true });
 
-  constructor(private writer: Writer) {}
-
-  download(data: Data, path: string): Observable<string> {
-    const notify = new Subject<string>();
-    const observable = notify.asObservable();
-    if (!data.parts) {
-      notify.complete();
-      return observable;
-    }
-
-    concat(...data.parts.map((part) => this.getSingle(part, path))).subscribe({
-      next: notify.next,
-      complete: notify.complete,
-    });
-
-    return observable;
-  }
-
-  private getSingle(target: string, outputPath: string): Observable<string> {
-    const notify = new Subject<string>();
+  download(target: string): Observable<Result> {
+    const notify = new Subject<Result>();
     if (!this.url) {
       notify.error('');
       return notify.asObservable();
@@ -40,7 +23,6 @@ export class DownloaderImpl implements Downloader {
       agent: this.agent,
     };
 
-    const fileName = target.match(/(.*\.ts)(\??.*)/);
     const req = https.get(option);
 
     req
@@ -51,15 +33,16 @@ export class DownloaderImpl implements Downloader {
             data.push(chunk);
           })
           .on('end', () => {
-            const filePath = outputPath + '/' + fileName;
             const dv = new DataView(Buffer.concat(data));
-            this.writer.writeFileSync(filePath, dv);
-            notify.next(target);
+            notify.next({
+              name: target,
+              data: dv,
+            });
             notify.complete();
           });
       })
       .on('error', (err) => notify.error(err))
       .end();
-    return notify.asObservable();
+    return notify.asObservable().pipe(take(1));
   }
 }

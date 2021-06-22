@@ -1,85 +1,68 @@
-import { Observable, Subject } from 'rxjs';
-import https, { Agent } from 'https';
-import fs from 'fs';
-import { RequestOptions } from 'https';
-import { map } from 'rxjs/operators';
-import { Data, Downloader, Injector, Parser } from './interfaces/interfaces';
+import { concat, Observable, Subject } from 'rxjs';
+import { Agent } from 'https';
+import {
+  Data,
+  Downloader,
+  Injector,
+  Parser,
+  Status,
+  Writer,
+} from './interfaces/interfaces';
 
-export interface IndexResult {
-  isLocalFile: boolean;
-  location: string;
-}
 export class Wrapper {
-  private url: URL;
-  private initiateFile: string;
   private readonly outPath: string;
   private readonly agent: Agent;
   private data: Data;
   private parser: Parser;
   private downloader: Downloader;
+  private writer: Writer;
 
-  constructor(
-    target: string,
-    outPath: string,
-    injector: Injector,
-    name = 'default'
-  ) {
-    this.url = new URL(target);
-    this.initiateFile = this.url.pathname.split('/').slice(-1)[0];
+  constructor(outPath: string, injector: Injector) {
     this.outPath = outPath;
     this.agent = new Agent({ keepAlive: true });
 
-    this.data = new Data(name);
+    this.data = new Data();
     this.parser = injector.get('Parser');
     this.downloader = injector.get('Downloader');
+    this.writer = injector.get('Writer');
   }
 
-  getIndex(): Observable<IndexResult> {
-    return this.get(this.initiateFile).pipe(
-      map((filename) => {
-        const manifest = this.parser.parse(fs.readFileSync(filename));
+  save(target: string): Observable<Status> {
+    const notify = new Subject<Status>();
 
-        const hasPlaylists = manifest.playlists;
-        this.data.index = hasPlaylists ? manifest.playlists[0].uri : filename;
-        this.data.parts = manifest.segments.map((s) => s.uri);
-
-        return {
-          isLocalFile: !hasPlaylists,
-          location: hasPlaylists ? manifest.playlists[0].uri : filename,
-        } as IndexResult;
-      })
-    );
-  }
-
-  get(path: string, fileName?: string): Observable<string> {
-    const notify = new Subject<string>();
-    const originalPathList = this.url.pathname.split('/').slice(0, -1);
-    originalPathList.push(path);
-
-    const outputFileName = `${this.outPath}/${fileName || path}`;
-
-    const option: RequestOptions = {
-      host: this.url.host,
-      path: originalPathList.join('/') + this.url.search,
-      agent: this.agent,
-    };
-
-    const req = https.get(option);
-    req.on('response', (res) => {
-      const data: Buffer[] = [];
-      res.on('data', (chunk: Buffer) => {
-        data.push(chunk);
-      });
-
-      res.on('end', () => {
-        fs.writeFileSync(outputFileName, Buffer.concat(data));
-        notify.next(outputFileName);
-        notify.complete();
-      });
+    this.downloader.url = new URL(target);
+    this.downloader.download(target).subscribe((result) => {
+      const manifest = this.parser.parse(result.data.buffer);
+      for (const segment of manifest.segments) {
+        this.data.parts.set(segment.uri, false);
+      }
+      const status: Status = {
+        total: this.data.parts.size,
+        downloaded: Array.from(this.data.parts.values()).filter((d) => d)
+          .length,
+      };
+      notify.next(status);
     });
-    req.on('error', (err) => notify.error(err));
-    req.end();
 
-    return notify;
+    concat(
+      ...Array.from(this.data.parts.keys()).map((part) =>
+        this.downloader.download(part)
+      )
+    ).subscribe({
+      next: (result) => {
+        const fileName = result.name.match(/(.*(\.ts|\.m3u8))(\??.*)/);
+        const filePath = this.outPath + '/' + fileName;
+        this.writer.writeFileSync(filePath, result.data);
+        const status: Status = {
+          total: this.data.parts.size,
+          downloaded: Array.from(this.data.parts.values()).filter((d) => d)
+            .length,
+        };
+        notify.next(status);
+      },
+      complete: notify.complete,
+    });
+
+    return notify.asObservable();
   }
 }
