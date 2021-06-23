@@ -1,8 +1,10 @@
 import { Writer } from './interfaces/interfaces';
 import fs from 'fs';
+import { Observable } from 'rxjs';
+import { fromPromise } from 'rxjs/internal-compatibility';
 
 export class WriterImpl implements Writer {
-  writeFileSync(path: string, data: DataView): void {
-    fs.writeFileSync(path, data);
+  writeFile(path: string, data: DataView): Observable<void> {
+    return fromPromise(fs.promises.writeFile(path, Buffer.from(data.buffer)));
   }
 }

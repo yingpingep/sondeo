@@ -1,48 +1,48 @@
 import { Downloader, Result } from './interfaces/interfaces';
 import https, { Agent, RequestOptions } from 'https';
-import { Observable, Subject } from 'rxjs';
-import { take } from 'rxjs/operators';
+import { Observable } from 'rxjs';
 
 export class DownloaderImpl implements Downloader {
   url: URL | undefined;
   private agent = new Agent({ keepAlive: true });
 
   download(target: string): Observable<Result> {
-    const notify = new Subject<Result>();
-    if (!this.url) {
-      notify.error('');
-      return notify.asObservable();
-    }
+    return new Observable((sub) => {
+      if (!this.url) {
+        sub.error('');
+        return;
+      }
 
-    const host = this.url.host;
-    const pathList = [...this.url.pathname.split('/').filter((e) => e), target];
-    const path = pathList.join('/') + this.url.search;
-    const option: RequestOptions = {
-      host,
-      path,
-      agent: this.agent,
-    };
+      const host = this.url.host;
+      const pathList = [
+        ...this.url.pathname
+          .split('/')
+          .filter((e) => e)
+          .slice(0, -1),
+        target,
+      ];
+      const path = '/' + pathList.join('/') + this.url.search;
+      const option: RequestOptions = {
+        host,
+        path,
+        agent: this.agent,
+      };
 
-    const req = https.get(option);
-
-    req
-      .on('response', (res) => {
+      https.get(option, (res) => {
         const data: Buffer[] = [];
         res
           .on('data', (chunk: Buffer) => {
             data.push(chunk);
           })
           .on('end', () => {
-            const dv = new DataView(Buffer.concat(data));
-            notify.next({
+            const buffer = Buffer.concat(data);
+            const dv = new DataView(buffer.buffer);
+            sub.next({
               name: target,
               data: dv,
             });
-            notify.complete();
           });
-      })
-      .on('error', (err) => notify.error(err))
-      .end();
-    return notify.asObservable().pipe(take(1));
+      });
+    });
   }
 }

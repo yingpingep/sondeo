@@ -31,7 +31,7 @@ export interface Parser {
 }
 
 export interface Writer {
-  writeFileSync(path: string, data: DataView): void;
+  writeFile(path: string, data: DataView): Observable<void>;
 }
 
 export interface Manifest {
