@@ -1,4 +1,4 @@
-import { concat, merge, Observable, of, Subject, throwError } from 'rxjs';
+import { concat, Observable, Subject, throwError } from 'rxjs';
 import { Agent } from 'https';
 import {
   Data,
@@ -8,7 +8,7 @@ import {
   Status,
   Writer,
 } from './interfaces/interfaces';
-import { catchError, finalize, map, switchMap, tap } from 'rxjs/operators';
+import { concatMap, switchMap } from 'rxjs/operators';
 
 export class Wrapper {
   private readonly outPath: string;
@@ -42,6 +42,7 @@ export class Wrapper {
 
           const fileName = result.name.match(/(.*(\.ts|\.m3u8))(\??.*)/)?.[0];
           const filePath = this.outPath + '/' + fileName;
+
           this.writer.writeFile(filePath, result.data);
 
           if (!manifest.segments || manifest.segments.length === 0) {
@@ -58,14 +59,13 @@ export class Wrapper {
               .length,
           };
           notify.next(status);
-
-          return merge(
+          return concat(
             ...Array.from(this.data.parts.keys()).map((part) =>
               this.downloader.download(part)
             )
           );
         }),
-        switchMap((result) => {
+        concatMap((result) => {
           const fileName =
             result.name.match(/(.*(\.ts|\.m3u8))(\??.*)/)?.[0] || '';
           const filePath = this.outPath + '/' + fileName;

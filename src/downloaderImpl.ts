@@ -41,6 +41,8 @@ export class DownloaderImpl implements Downloader {
               name: target,
               data: dv,
             });
+
+            sub.complete();
           });
       });
     });
