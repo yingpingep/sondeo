@@ -52,6 +52,8 @@ export class Wrapper {
           for (const segment of manifest.segments) {
             this.data.parts.set(segment.uri, false);
           }
+          const key = manifest.segments[0].key;
+          this.data.parts.set(key.uri, false);
 
           const status: Status = {
             total: this.data.parts.size,
