@@ -29,14 +29,19 @@ export class DownloaderImpl implements Downloader {
       };
 
       https.get(option, (res) => {
+        const contentLength = +(res.headers['content-length'] || 0);
         const data: Buffer[] = [];
         res
-          .on('data', (chunk: Buffer) => {
+          .on('data', (chunk: any) => {
             data.push(chunk);
           })
           .on('end', () => {
             const buffer = Buffer.concat(data);
-            const dv = new DataView(buffer.buffer);
+            const dv = new DataView(
+              buffer.buffer,
+              buffer.byteOffset,
+              contentLength
+            );
             sub.next({
               name: target,
               data: dv,

@@ -1,9 +1,16 @@
 import { Writer } from './interfaces/interfaces';
 import fs from 'fs';
-import { from, Observable } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
+import { shareReplay } from 'rxjs/operators';
 
 export class WriterImpl implements Writer {
   writeFile(path: string, data: DataView): Observable<void> {
-    return from(fs.promises.writeFile(path, Buffer.from(data.buffer)));
+    const obj = new Subject<void>();
+
+    fs.writeFile(path, data, () => {
+      obj.next();
+      obj.complete();
+    });
+    return obj.asObservable().pipe(shareReplay(1));
   }
 }
