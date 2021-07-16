@@ -11,6 +11,6 @@ export class WriterImpl implements Writer {
       obj.next();
       obj.complete();
     });
-    return obj.asObservable().pipe(shareReplay(1));
+    return obj.asObservable();
   }
 }

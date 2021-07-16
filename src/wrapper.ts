@@ -1,14 +1,15 @@
-import { concat, Observable, Subject, throwError } from 'rxjs';
+import { concat, forkJoin, merge, Observable, Subject, throwError } from 'rxjs';
 import { Agent } from 'https';
 import {
   Data,
   Downloader,
   Injector,
   Parser,
+  Result,
   Status,
   Writer,
 } from './interfaces/interfaces';
-import { concatMap, switchMap } from 'rxjs/operators';
+import { concatMap, delayWhen, map, switchMap, tap } from 'rxjs/operators';
 
 export class Wrapper {
   private readonly outPath: string;
@@ -17,6 +18,8 @@ export class Wrapper {
   private parser: Parser;
   private downloader: Downloader;
   private writer: Writer;
+  private downloaded$: Subject<Result>;
+  private trigger$: Subject<void>;
 
   constructor(outPath: string, injector: Injector) {
     this.outPath = outPath;
@@ -26,10 +29,24 @@ export class Wrapper {
     this.parser = injector.get('Parser');
     this.downloader = injector.get('Downloader');
     this.writer = injector.get('Writer');
+
+    this.downloaded$ = new Subject<Result>();
+    this.trigger$ = new Subject<void>();
   }
 
   save(target: string): Observable<Status> {
     const notify = new Subject<Status>();
+    this.downloaded$
+      .pipe(concatMap((result) => this.saveFile(result)))
+      .subscribe((fileName) => {
+        this.data.parts.set(fileName, true);
+        const status: Status = {
+          total: this.data.parts.size,
+          downloaded: Array.from(this.data.parts.values()).filter((d) => d)
+            .length,
+        };
+        notify.next(status);
+      });
 
     const url = new URL(target);
     this.downloader.url = url;
@@ -39,11 +56,8 @@ export class Wrapper {
       .pipe(
         switchMap((result) => {
           const manifest = this.parser.parse(Buffer.from(result.data.buffer));
-
-          const fileName = result.name.match(/(.*(\.ts|\.m3u8))(\??.*)/)?.[0];
-          const filePath = this.outPath + '/' + fileName;
-
-          this.writer.writeFile(filePath, result.data);
+          this.downloaded$.next(result);
+          this.trigger$.next();
 
           if (!manifest.segments || manifest.segments.length === 0) {
             return throwError('error');
@@ -68,23 +82,20 @@ export class Wrapper {
               this.downloader.download(part)
             )
           );
-        }),
-        concatMap((result) => {
-          const fileName =
-            result.name.match(/(.*(\.ts|\.m3u8))(\??.*)/)?.[0] || '';
-          const filePath = this.outPath + '/' + fileName;
-          this.data.parts.set(fileName, true);
-          const status: Status = {
-            total: this.data.parts.size,
-            downloaded: Array.from(this.data.parts.values()).filter((d) => d)
-              .length,
-          };
-          notify.next(status);
-          return this.writer.writeFile(filePath, result.data);
         })
       )
-      .subscribe();
+      .subscribe((result) => {
+        this.downloaded$.next(result);
+      });
 
     return notify.asObservable();
+  }
+
+  private saveFile(result: Result): Observable<string> {
+    const fileName = result.name.match(/(.*(\.ts|\.m3u8))(\??.*)/)?.[0] || '';
+    const filePath = this.outPath + '/' + fileName;
+    return this.writer
+      .writeFile(filePath, result.data)
+      .pipe(map(() => fileName));
   }
 }
